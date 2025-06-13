@@ -7,15 +7,23 @@ import concurrent.futures
 from queue import Queue
 import threading
 
-def process_file(file_path, reference_names, file_extensions):
+def process_file(file_path, reference_names, file_extensions, prefix=None):
     """处理单个文件的函数"""
     if file_path.is_file():
         if file_extensions is None or file_path.suffix.lower() in file_extensions:
-            if file_path.stem in reference_names:
-                return file_path
+            # 如果设置了前缀，则检查文件名是否以该前缀开头
+            if prefix:
+                if file_path.stem.startswith(prefix):
+                    # 移除前缀后进行比较
+                    name_without_prefix = file_path.stem[len(prefix):]
+                    if name_without_prefix in reference_names:
+                        return file_path
+            else:
+                if file_path.stem in reference_names:
+                    return file_path
     return None
 
-def find_and_copy_files(folder_f, folder_a, output_dir, file_extensions=None):
+def find_and_copy_files(folder_f, folder_a, output_dir, file_extensions=None, prefix=None):
     """
     根据文件夹F中的文件名在文件夹A中查找相同名称的文件并复制
     
@@ -24,6 +32,7 @@ def find_and_copy_files(folder_f, folder_a, output_dir, file_extensions=None):
         folder_a (str): 需要搜索的文件夹路径
         output_dir (str): 输出文件夹路径
         file_extensions (set): 要处理的文件扩展名集合，如 {'.jpg', '.png'}
+        prefix (str): 文件名前缀
     """
     start_time = time.time()
     
@@ -69,7 +78,7 @@ def find_and_copy_files(folder_f, folder_a, output_dir, file_extensions=None):
     with concurrent.futures.ThreadPoolExecutor(max_workers=min(32, os.cpu_count() * 4)) as executor:
         # 提交所有任务
         futures = [
-            executor.submit(process_file, file_path, reference_names, file_extensions)
+            executor.submit(process_file, file_path, reference_names, file_extensions, prefix)
             for file_path in all_files
         ]
         
@@ -119,6 +128,12 @@ def main():
         extensions = input("请输入文件扩展名（用逗号分隔，例如：.jpg,.png,.gif）: ").strip()
         file_extensions = {ext.strip().lower() for ext in extensions.split(',')}
     
+    # 询问是否需要文件名前缀
+    use_prefix = input("搜索的文件名是否需要前缀？(y/n): ").strip().lower() == 'y'
+    prefix = None
+    if use_prefix:
+        prefix = input("请输入文件名前缀: ").strip()
+    
     # 检查输入路径是否存在
     if not os.path.exists(folder_f):
         print("错误：参考文件夹F不存在！")
@@ -128,7 +143,7 @@ def main():
         return
     
     # 执行查找和复制
-    find_and_copy_files(folder_f, folder_a, output_dir, file_extensions)
+    find_and_copy_files(folder_f, folder_a, output_dir, file_extensions, prefix)
 
 if __name__ == "__main__":
     main() 
